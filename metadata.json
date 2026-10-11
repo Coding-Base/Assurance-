@@ -1,0 +1,6 @@
+{
+  "name": "SubseaFlow CAD - Modular Flow Assurance & Multiphase Simulation Platform",
+  "description": "Interactive CAD canvas and Beggs & Brill multiphase flow assurance simulator with DAG topology validation, hydrate risk evaluation, and multi-tenant subsea engineering.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
