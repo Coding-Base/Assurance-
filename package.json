@@ -4,12 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx src/tests/runCliTests.ts"
+    "test": "tsx src/tests/runCliTests.ts",
+    "test:python": "python3 backend/test_solver.py"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

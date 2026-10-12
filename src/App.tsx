@@ -67,8 +67,8 @@ export default function App() {
     return serializeDAGToJSON(nodes, edges, 'proj_subsea_tieback_01', currentWorkspace.id);
   }, [nodes, edges, currentWorkspace.id]);
 
-  // Primary Solver Action: Beggs & Brill Multiphase Discretization
-  const handleRunSimulation = () => {
+  // Primary Solver Action: Beggs & Brill Multiphase Discretization (calls Python 3 solver / Django API)
+  const handleRunSimulation = async () => {
     if (!validationReport.isValid) return;
 
     // Check Tenant Quota Balance
@@ -79,8 +79,34 @@ export default function App() {
 
     setIsSimulating(true);
 
-    setTimeout(() => {
+    try {
+      // 1. Attempt to execute via backend Python 3 Beggs & Brill engine
+      let simOutput: any = null;
+      let solverEngineName = 'Python 3.10 Beggs & Brill Solver (Django Protocol)';
+
       try {
+        const response = await fetch('/api/v1/simulations/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(serializedDAG),
+        });
+
+        if (response.ok) {
+          const pyRes = await response.json();
+          simOutput = {
+            summary: pyRes.summary,
+            spatial_profile: pyRes.spatial_profile,
+            unmitigated_baseline: pyRes.unmitigated_baseline,
+          };
+          solverEngineName = pyRes.engine || 'Python 3.10 Beggs & Brill Solver (Django Protocol)';
+        }
+      } catch (netErr) {
+        // Fallback to client-side physics solver if standalone
+        console.warn('Backend proxy offline, computing via in-process solver:', netErr);
+      }
+
+      // If backend was not reached, execute local physics engine
+      if (!simOutput) {
         const wellhead = nodes.find((n) => n.type === 'wellhead');
         const pipe = nodes.find((n) => n.type === 'pipeline_segment');
 
@@ -89,7 +115,6 @@ export default function App() {
           return;
         }
 
-        // Gather attached insulation and chemical injection parameters
         const insAtt =
           pipe.attachments?.find((a) => a.type === 'thermal_insulation')?.params ||
           nodes.find((n) => n.type === 'thermal_insulation')?.params;
@@ -100,57 +125,58 @@ export default function App() {
 
         const pigAtt = nodes.find((n) => n.type === 'pig_station')?.params;
 
-        const simOutput = runSubseaSimulation({
+        simOutput = runSubseaSimulation({
           wellhead: wellhead.params as any,
           pipe: pipe.params as any,
           insulation: insAtt as any,
           chemical: chemAtt as any,
           pig: pigAtt as any,
         });
-
-        // Transactional decrement for trial workspace
-        let remainingRuns = currentWorkspace.trial_runs_left;
-        if (currentWorkspace.tier !== 'ENTERPRISE') {
-          remainingRuns = Math.max(0, currentWorkspace.trial_runs_left - 1);
-          const updatedWorkspaces = workspaces.map((w) =>
-            w.id === currentWorkspace.id ? { ...w, trial_runs_left: remainingRuns } : w
-          );
-          setWorkspaces(updatedWorkspaces);
-          setCurrentWorkspace({ ...currentWorkspace, trial_runs_left: remainingRuns });
-        }
-
-        const fullResult: SimulationResult = {
-          simulation_id: `sim_run_${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          project_id: 'proj_subsea_tieback_01',
-          workspace_id: currentWorkspace.id,
-          summary: simOutput.summary,
-          spatial_profile: simOutput.spatial_profile,
-          unmitigated_baseline: simOutput.unmitigated_baseline,
-          execution_time_ms: 118,
-          tenant_quota_remaining: remainingRuns,
-        };
-
-        setSimulationResult(fullResult);
-
-        // Confetti celebration if safe flow assured
-        if (!fullResult.summary.is_hydrate_plug_predicted && fullResult.summary.arrival_temp_c >= 14.0) {
-          try {
-            confetti({
-              particleCount: 50,
-              spread: 60,
-              origin: { y: 0.8 },
-            });
-          } catch {
-            // Ignore if confetti disabled in environment
-          }
-        }
-      } catch (err) {
-        console.error('Simulation execution failed:', err);
-      } finally {
-        setIsSimulating(false);
+        solverEngineName = 'Beggs & Brill (1973) Multiphase Discretizer';
       }
-    }, 450);
+
+      // Transactional decrement for trial workspace
+      let remainingRuns = currentWorkspace.trial_runs_left;
+      if (currentWorkspace.tier !== 'ENTERPRISE') {
+        remainingRuns = Math.max(0, currentWorkspace.trial_runs_left - 1);
+        const updatedWorkspaces = workspaces.map((w) =>
+          w.id === currentWorkspace.id ? { ...w, trial_runs_left: remainingRuns } : w
+        );
+        setWorkspaces(updatedWorkspaces);
+        setCurrentWorkspace({ ...currentWorkspace, trial_runs_left: remainingRuns });
+      }
+
+      const fullResult: SimulationResult = {
+        simulation_id: `sim_run_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        project_id: 'proj_subsea_tieback_01',
+        workspace_id: currentWorkspace.id,
+        summary: simOutput.summary,
+        spatial_profile: simOutput.spatial_profile,
+        unmitigated_baseline: simOutput.unmitigated_baseline,
+        execution_time_ms: 118,
+        tenant_quota_remaining: remainingRuns,
+      };
+
+      setSimulationResult(fullResult);
+
+      // Confetti celebration if safe flow assured
+      if (!fullResult.summary.is_hydrate_plug_predicted && fullResult.summary.arrival_temp_c >= 14.0) {
+        try {
+          confetti({
+            particleCount: 50,
+            spread: 60,
+            origin: { y: 0.8 },
+          });
+        } catch {
+          // Ignore
+        }
+      }
+    } catch (err) {
+      console.error('Simulation execution failed:', err);
+    } finally {
+      setIsSimulating(false);
+    }
   };
 
   // Run initial simulation on mount with default benchmark scenario

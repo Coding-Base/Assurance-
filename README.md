@@ -1,11 +1,10 @@
-# SubseaFlow CAD - Modular Flow Assurance & Multi-Tenant Simulation Platform (v2)
-
 ![SubseaFlow CI](https://img.shields.io/badge/Physics_Validation-100%25_PASSED-emerald?style=for-the-badge)
+![Backend](https://img.shields.io/badge/Backend-Django_REST_Framework_%2B_Python_3.10-blue?style=for-the-badge)
 ![Beggs & Brill](https://img.shields.io/badge/Solver-Beggs_%26_Brill_(1973)-cyan?style=for-the-badge)
 ![Hammerschmidt](https://img.shields.io/badge/Hydrate_Model-Hammerschmidt_MEG-blue?style=for-the-badge)
 ![Multi-Tenant](https://img.shields.io/badge/Multi--Tenant-Row--Level_RLS-indigo?style=for-the-badge)
 
-An interactive, computer-aided engineering (CAD) canvas and numerical simulation platform for offshore subsea flow assurance engineers. Rather than relying on static numerical inputs, engineers assemble production subsea architecture visually on an infinite bathymetric CAD canvas using modular, interlocking "puzzle blocks" (Wellheads, Flowlines, Thermal Insulation Sleeves, Chemical Injection Quills, Pig Launchers, and Topside Separators).
+An interactive, computer-aided engineering (CAD) canvas and numerical simulation platform for offshore subsea flow assurance engineers, coupling a React 19 interactive canvas with a Python 3.10 / Django REST Framework numerical solver backend. Rather than relying on static numerical inputs, engineers assemble production subsea architecture visually on an infinite bathymetric CAD canvas using modular, interlocking "puzzle blocks" (Wellheads, Flowlines, Thermal Insulation Sleeves, Chemical Injection Quills, Pig Launchers, and Topside Separators).
 
 The system performs live directional socket compatibility checking, pre-flight topological linting, serializes the visual graph into a normalized acyclic Directed Acyclic Graph (DAG), and passes the chronological hydraulic chain to the Beggs & Brill multiphase and Hammerschmidt hydrate physics solver.
 

@@ -1,9 +1,9 @@
 /**
- * DatabaseSchemaModal Component - Viewer for PostgreSQL DDL & Django ORM Models
+ * DatabaseSchemaModal Component - Viewer for PostgreSQL DDL, Django ORM, and Python Physics Solvers
  */
 
 import React, { useState } from 'react';
-import { X, Copy, Check, Download, Database, FileCode, Layers } from 'lucide-react';
+import { X, Copy, Check, Download, Database, FileCode, Layers, Terminal, Sparkles } from 'lucide-react';
 
 interface DatabaseSchemaModalProps {
   onClose: () => void;
@@ -122,15 +122,53 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;`;
 
-const DJANGO_MODELS_PY = `# ==============================================================================
-# SubseaFlow CAD Platform - Django ORM Multi-Tenant Models (v2)
-# Multi-tenant workspace isolation, JWT verification, and simulation run models.
-# ==============================================================================
+const DJANGO_VIEWS_PY = `"""
+Django REST Framework Views (POST /api/v1/simulations/run/)
+Executes Beggs & Brill (1973) 1D discretization directly in Python.
+"""
+import time
+import uuid
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework import status
 
-import hmac
-import hashlib
+from physics_solver import solve_subsea_chain
+from .models import Workspace, SimulationRunResult
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def run_simulation(request):
+    data = request.data
+    project_id = data.get("project_id", "proj_subsea_tieback_01")
+    workspace_id = data.get("workspace_id", "ws_alpha_energy")
+    network_chain = data.get("network_chain", [])
+
+    if not network_chain:
+        return Response({"error": "Empty network_chain"}, status=status.HTTP_400_BAD_REQUEST)
+
+    t0 = time.time()
+    sim_output = solve_subsea_chain(network_chain)
+    duration_ms = int((time.time() - t0) * 1000)
+
+    run_id = f"sim_run_{uuid.uuid4().hex[:12]}"
+    response_payload = {
+        "simulation_id": run_id,
+        "project_id": project_id,
+        "workspace_id": workspace_id,
+        "execution_time_ms": duration_ms,
+        "summary": sim_output["summary"],
+        "spatial_profile": sim_output["spatial_profile"],
+        "unmitigated_baseline": sim_output["unmitigated_baseline"],
+        "backend": "Django REST Framework / Python 3 Beggs & Brill"
+    }
+    return Response(response_payload, status=status.HTTP_200_OK)`;
+
+const DJANGO_MODELS_PY = `"""
+Django ORM Multi-Tenant Models
+Multi-tenant workspace isolation, row locking, and spatial simulation results.
+"""
 from django.db import models, transaction
-from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 
 class Workspace(models.Model):
@@ -154,25 +192,12 @@ class Workspace(models.Model):
             ws.save(update_fields=['trial_runs_left'])
             return ws.trial_runs_left
 
-class CustomUser(AbstractUser):
-    active_workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='members', null=True)
-    role = models.CharField(max_length=64, default='Lead Flow Assurance Engineer')
-
-class SimulationProject(models.Model):
-    id = models.CharField(max_length=64, primary_key=True)
-    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE)
-    name = models.CharField(max_length=255)
-    canvas_version = models.CharField(max_length=16, default='2.1')
-    graph_topology = models.JSONField()
-    serialized_chain = models.JSONField()
-    is_valid_dag = models.BooleanField(default=False)
-
 class SimulationRunResult(models.Model):
     id = models.CharField(max_length=64, primary_key=True)
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE)
-    project = models.ForeignKey(SimulationProject, on_delete=models.CASCADE)
+    project_id = models.CharField(max_length=64)
     status = models.CharField(max_length=32, default='COMPLETED')
-    execution_time_ms = models.PositiveIntegerField(default=120)
+    execution_time_ms = models.PositiveIntegerField(default=100)
     total_length_km = models.DecimalField(max_digits=8, decimal_places=2)
     arrival_pressure_bar = models.DecimalField(max_digits=8, decimal_places=2)
     arrival_temp_c = models.DecimalField(max_digits=8, decimal_places=2)
@@ -182,25 +207,48 @@ class SimulationRunResult(models.Model):
     spatial_profile_data = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)`;
 
+const CELERY_TASKS_PY = `"""
+Celery / Redis Asynchronous Task (backend/simulations/tasks.py)
+Distributed high-resolution multiphase meshing for subsea tiebacks.
+"""
+from celery import shared_task
+from physics_solver import solve_subsea_chain
+
+@shared_task
+def run_asynchronous_simulation_task(project_id: str, workspace_id: str, network_chain: list, delta_x_m: float = 100.0):
+    result = solve_subsea_chain(network_chain, delta_x_m=delta_x_m)
+    return {
+        "project_id": project_id,
+        "workspace_id": workspace_id,
+        "status": "COMPLETED",
+        "result": result
+    }`;
+
 export const DatabaseSchemaModal: React.FC<DatabaseSchemaModalProps> = ({ onClose }) => {
-  const [tab, setTab] = useState<'sql' | 'django'>('sql');
+  const [tab, setTab] = useState<'sql' | 'views' | 'models' | 'celery'>('sql');
   const [copied, setCopied] = useState(false);
 
-  const activeCode = tab === 'sql' ? POSTGRESQL_SCHEMA_SQL : DJANGO_MODELS_PY;
-  const fileName = tab === 'sql' ? 'schema.sql' : 'models.py';
+  const fileMap = {
+    sql: { code: POSTGRESQL_SCHEMA_SQL, name: 'schema.sql', path: 'src/db/schema.sql' },
+    views: { code: DJANGO_VIEWS_PY, name: 'views.py (DRF)', path: 'backend/simulations/views.py' },
+    models: { code: DJANGO_MODELS_PY, name: 'models.py (Django)', path: 'backend/simulations/models.py' },
+    celery: { code: CELERY_TASKS_PY, name: 'tasks.py (Celery)', path: 'backend/simulations/tasks.py' },
+  };
+
+  const active = fileMap[tab];
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(activeCode);
+    navigator.clipboard.writeText(active.code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownload = () => {
-    const blob = new Blob([activeCode], { type: 'text/plain' });
+    const blob = new Blob([active.code], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileName;
+    a.download = active.name.split(' ')[0];
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -216,38 +264,18 @@ export const DatabaseSchemaModal: React.FC<DatabaseSchemaModalProps> = ({ onClos
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                <span>Database Schema & Django ORM Models</span>
-                <span className="text-[10px] font-mono bg-indigo-950 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-800">
-                  Multi-Tenant
+                <span>Django REST Framework & PostgreSQL Schema</span>
+                <span className="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-800">
+                  Python 3.10 Backend
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
-                PostgreSQL schema with row-level locks and Django REST Framework physics storage
+                PostgreSQL RLS DDL, DRF REST views, Django ORM models, and Celery asynchronous tasks
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            {/* Tab buttons */}
-            <div className="flex items-center bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-xs font-mono">
-              <button
-                onClick={() => setTab('sql')}
-                className={`px-3 py-1 rounded-md transition ${
-                  tab === 'sql' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                schema.sql (PostgreSQL)
-              </button>
-              <button
-                onClick={() => setTab('django')}
-                className={`px-3 py-1 rounded-md transition ${
-                  tab === 'django' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                models.py (Django ORM)
-              </button>
-            </div>
-
             <button
               onClick={handleCopy}
               className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono border border-slate-700 transition"
@@ -268,7 +296,7 @@ export const DatabaseSchemaModal: React.FC<DatabaseSchemaModalProps> = ({ onClos
             <button
               onClick={handleDownload}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition"
-              title={`Download ${fileName}`}
+              title={`Download ${active.name}`}
             >
               <Download className="w-4 h-4" />
             </button>
@@ -282,15 +310,32 @@ export const DatabaseSchemaModal: React.FC<DatabaseSchemaModalProps> = ({ onClos
           </div>
         </div>
 
+        {/* Tab Switcher Ribbon */}
+        <div className="px-4 py-2 bg-slate-950 border-b border-slate-800 flex items-center space-x-2 text-xs font-mono">
+          {(['sql', 'views', 'models', 'celery'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-3 py-1 rounded-md transition font-medium ${
+                tab === t
+                  ? 'bg-indigo-600 text-white font-bold'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              {fileMap[t].name}
+            </button>
+          ))}
+        </div>
+
         {/* Code Content */}
         <div className="flex-1 overflow-y-auto p-4 bg-slate-950 font-mono text-xs text-indigo-200 custom-scrollbar select-text">
-          <pre className="leading-relaxed whitespace-pre-wrap">{activeCode}</pre>
+          <pre className="leading-relaxed whitespace-pre-wrap">{active.code}</pre>
         </div>
 
         {/* Modal Footer */}
         <div className="p-3 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between text-xs text-slate-400">
-          <span>Row-Level Tenant Isolation via workspace_id foreign keys and RLS stored procedures.</span>
-          <span className="font-mono text-[11px] text-slate-500">Path: /src/db/{fileName}</span>
+          <span>Row-level locks via SELECT ... FOR UPDATE and DRF endpoint /api/v1/simulations/run/</span>
+          <span className="font-mono text-[11px] text-cyan-400">{active.path}</span>
         </div>
       </div>
     </div>
