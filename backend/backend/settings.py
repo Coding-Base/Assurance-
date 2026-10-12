@@ -60,17 +60,30 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
-# Database configuration: PostgreSQL with SQLite fallback for local test runs
-DATABASES = {
-    'default': {
-        'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.environ.get('DB_NAME', BASE_DIR / 'db.sqlite3'),
-        'USER': os.environ.get('DB_USER', 'subsea_admin'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'subsea_secret_password'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+# Database configuration: Parses DATABASE_URL with SQLite fallback
+from urllib.parse import urlparse
+
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+
+if DATABASE_URL and ('postgres' in DATABASE_URL):
+    parsed = urlparse(DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': parsed.path.lstrip('/'),
+            'USER': parsed.username or 'subsea_admin',
+            'PASSWORD': parsed.password or 'subsea_secret_password',
+            'HOST': parsed.hostname or 'localhost',
+            'PORT': parsed.port or 5432,
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'subseaflow.sqlite3',
+        }
+    }
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [

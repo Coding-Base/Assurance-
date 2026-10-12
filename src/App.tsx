@@ -16,6 +16,7 @@ import { DagJsonViewerModal } from './components/DagJsonViewerModal';
 import { DatabaseSchemaModal } from './components/DatabaseSchemaModal';
 import { TestSuiteModal } from './components/TestSuiteModal';
 import { GitHubDeployModal } from './components/GitHubDeployModal';
+import { DjangoAdminModal } from './components/DjangoAdminModal';
 
 import {
   SubseaNode,
@@ -47,6 +48,7 @@ export default function App() {
   // UI Modals & Panels State
   const [showDagModal, setShowDagModal] = useState<boolean>(false);
   const [showDbModal, setShowDbModal] = useState<boolean>(false);
+  const [showDjangoAdminModal, setShowDjangoAdminModal] = useState<boolean>(false);
   const [showTestModal, setShowTestModal] = useState<boolean>(false);
   const [showGithubModal, setShowGithubModal] = useState<boolean>(false);
   const [isLinterCollapsed, setIsLinterCollapsed] = useState<boolean>(false);
@@ -556,6 +558,7 @@ export default function App() {
         isValidDag={validationReport.isValid}
         onOpenDagModal={() => setShowDagModal(true)}
         onOpenDbModal={() => setShowDbModal(true)}
+        onOpenDjangoAdminModal={() => setShowDjangoAdminModal(true)}
         onOpenTestModal={() => setShowTestModal(true)}
         onOpenGithubModal={() => setShowGithubModal(true)}
         onExportReport={handleExportReport}
@@ -659,6 +662,14 @@ export default function App() {
       )}
 
       {showDbModal && <DatabaseSchemaModal onClose={() => setShowDbModal(false)} />}
+
+      {showDjangoAdminModal && (
+        <DjangoAdminModal
+          workspaces={workspaces}
+          onUpdateWorkspaces={setWorkspaces}
+          onClose={() => setShowDjangoAdminModal(false)}
+        />
+      )}
 
       {showTestModal && <TestSuiteModal onClose={() => setShowTestModal(false)} />}
 

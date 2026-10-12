@@ -184,6 +184,20 @@ export interface WorkspaceTenant {
   created_at: string;
 }
 
+export interface CommercialLicenseRecord {
+  id: string;
+  organization_name: string;
+  workspace_id?: string;
+  tier: 'TRIAL' | 'PROFESSIONAL' | 'ENTERPRISE' | 'ACADEMIC';
+  allowed_runs: number;
+  license_key_hmac: string;
+  features: string[];
+  is_revoked: boolean;
+  expires_at: string;
+  issued_by: string;
+  created_at: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;

@@ -32,6 +32,7 @@ interface NavbarProps {
   isValidDag: boolean;
   onOpenDagModal: () => void;
   onOpenDbModal: () => void;
+  onOpenDjangoAdminModal: () => void;
   onOpenTestModal: () => void;
   onOpenGithubModal: () => void;
   onExportReport: () => void;
@@ -48,6 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isValidDag,
   onOpenDagModal,
   onOpenDbModal,
+  onOpenDjangoAdminModal,
   onOpenTestModal,
   onOpenGithubModal,
   onExportReport,
@@ -265,6 +267,17 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <Database className="w-3.5 h-3.5 text-indigo-400" />
           <span className="hidden sm:inline">DB Schema</span>
+        </button>
+
+        {/* Django Admin Portal Button */}
+        <button
+          onClick={onOpenDjangoAdminModal}
+          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-[#0c4b33]/80 hover:bg-[#0c4b33] border border-[#14533a] text-xs font-mono text-emerald-300 hover:text-white transition shadow-sm"
+        >
+          <span className="w-3.5 h-3.5 rounded bg-[#417690] text-white text-[9px] font-bold flex items-center justify-center font-mono">
+            dj
+          </span>
+          <span className="hidden md:inline font-bold">Django Admin</span>
         </button>
 
         {/* GitHub & Deploy Modal */}
